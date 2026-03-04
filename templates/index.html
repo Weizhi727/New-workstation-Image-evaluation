@@ -1,0 +1,1196 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>DINOv3 工業視覺評估系統</title>
+<style>
+/* ──────────── CSS Variables ──────────── */
+:root {
+  --bg:      #0d0d1a;
+  --surface: #161630;
+  --card:    #1e1e40;
+  --border:  #2a2a55;
+  --primary: #4cc9f0;
+  --purple:  #7209b7;
+  --pink:    #f72585;
+  --green:   #06d6a0;
+  --yellow:  #ffd166;
+  --text:    #e0e0f5;
+  --muted:   #8888aa;
+  --radius:  12px;
+  --shadow:  0 4px 24px rgba(0,0,0,0.4);
+}
+
+/* ──────────── Reset & Base ──────────── */
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,sans-serif;min-height:100vh;line-height:1.6}
+button{cursor:pointer;font-family:inherit}
+input,textarea{font-family:inherit}
+img{max-width:100%;display:block}
+a{color:var(--primary);text-decoration:none}
+
+/* ──────────── Scrollbar ──────────── */
+::-webkit-scrollbar{width:6px;height:6px}
+::-webkit-scrollbar-track{background:var(--surface)}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+
+/* ──────────── Header ──────────── */
+.header{
+  background:linear-gradient(135deg,#0d0d1a 0%,#161640 100%);
+  border-bottom:1px solid var(--border);
+  padding:16px 32px;
+  display:flex;align-items:center;justify-content:space-between;
+  position:sticky;top:0;z-index:100;
+  box-shadow:var(--shadow);
+}
+.header h1{
+  font-size:1.4rem;font-weight:700;
+  background:linear-gradient(90deg,var(--primary),var(--purple));
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+  letter-spacing:1px;
+}
+.status-badge{
+  display:flex;align-items:center;gap:8px;
+  font-size:0.8rem;color:var(--muted);
+}
+.status-dot{width:8px;height:8px;border-radius:50%;background:#555}
+.status-dot.on{background:var(--green);box-shadow:0 0 6px var(--green)}
+.status-dot.off{background:var(--yellow)}
+
+/* ──────────── Tabs ──────────── */
+.tabs{
+  display:flex;gap:4px;padding:20px 32px 0;
+  border-bottom:1px solid var(--border);
+}
+.tab-btn{
+  padding:10px 28px;border:none;background:transparent;
+  color:var(--muted);font-size:1rem;font-weight:600;
+  border-bottom:3px solid transparent;transition:all .2s;
+}
+.tab-btn:hover{color:var(--text)}
+.tab-btn.active{
+  color:var(--primary);
+  border-bottom-color:var(--primary);
+}
+
+/* ──────────── Layout ──────────── */
+.container{max-width:1400px;margin:0 auto;padding:28px 32px}
+.section{display:none}
+.section.active{display:block}
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+@media(max-width:900px){.grid-2{grid-template-columns:1fr}}
+
+/* ──────────── Card ──────────── */
+.card{
+  background:var(--card);border:1px solid var(--border);
+  border-radius:var(--radius);padding:20px;
+}
+.card-title{
+  font-size:0.95rem;font-weight:700;color:var(--primary);
+  margin-bottom:14px;letter-spacing:.5px;
+  display:flex;align-items:center;gap:8px;
+}
+.card-title .icon{font-size:1.1rem}
+
+/* ──────────── Upload Zone ──────────── */
+.upload-zone{
+  border:2px dashed var(--border);border-radius:var(--radius);
+  padding:32px 20px;text-align:center;cursor:pointer;
+  transition:all .2s;position:relative;
+}
+.upload-zone:hover,.upload-zone.drag-over{
+  border-color:var(--primary);
+  background:rgba(76,201,240,0.05);
+}
+.upload-zone input[type=file]{
+  position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%;
+}
+.upload-icon{font-size:2.4rem;margin-bottom:8px;opacity:.7}
+.upload-label{font-size:0.95rem;color:var(--muted);margin-bottom:4px}
+.upload-sublabel{font-size:0.78rem;color:var(--border)}
+.upload-ok .upload-zone{border-color:rgba(76,201,240,.4)}
+.upload-ng .upload-zone{border-color:rgba(247,37,133,.3)}
+
+/* ──────────── File list ──────────── */
+.file-list{
+  margin-top:10px;max-height:110px;overflow-y:auto;
+  display:flex;flex-wrap:wrap;gap:6px;
+}
+.file-tag{
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:20px;padding:3px 10px;font-size:0.76rem;color:var(--muted);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:160px;
+}
+.file-tag.ok-tag{border-color:rgba(76,201,240,.4);color:var(--primary)}
+.file-tag.ng-tag{border-color:rgba(247,37,133,.4);color:var(--pink)}
+
+/* ──────────── Buttons ──────────── */
+.btn{
+  display:inline-flex;align-items:center;justify-content:center;gap:8px;
+  padding:10px 24px;border-radius:8px;border:none;
+  font-size:0.95rem;font-weight:600;transition:all .2s;
+}
+.btn-primary{
+  background:linear-gradient(135deg,var(--primary),#3a8fc2);color:#0d0d1a;
+}
+.btn-primary:hover{opacity:.85;transform:translateY(-1px)}
+.btn-secondary{
+  background:linear-gradient(135deg,var(--purple),#5a07a0);color:white;
+}
+.btn-secondary:hover{opacity:.85;transform:translateY(-1px)}
+.btn-danger{background:linear-gradient(135deg,var(--pink),#c0125b);color:white}
+.btn-danger:hover{opacity:.85}
+.btn-success{background:linear-gradient(135deg,var(--green),#048a6a);color:#0d0d1a}
+.btn-success:hover{opacity:.85;transform:translateY(-1px)}
+.btn-outline{
+  background:transparent;border:1px solid var(--border);color:var(--muted);
+}
+.btn-outline:hover{border-color:var(--primary);color:var(--primary)}
+.btn:disabled{opacity:.4;cursor:not-allowed;transform:none!important}
+.btn-sm{padding:6px 14px;font-size:0.82rem}
+.btn-full{width:100%;margin-top:14px}
+
+/* ──────────── Spinner / Progress ──────────── */
+.spinner{
+  width:40px;height:40px;border:4px solid var(--border);
+  border-top-color:var(--primary);border-radius:50%;
+  animation:spin .8s linear infinite;margin:0 auto;
+}
+@keyframes spin{to{transform:rotate(360deg)}}
+.loading-box{
+  display:none;flex-direction:column;align-items:center;gap:12px;
+  padding:32px;color:var(--muted);font-size:.9rem;
+}
+.loading-box.show{display:flex}
+
+/* ──────────── Metrics ──────────── */
+.metrics-row{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin:20px 0}
+@media(max-width:700px){.metrics-row{grid-template-columns:1fr}}
+.metric-card{
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:10px;padding:16px;text-align:center;
+}
+.metric-val{font-size:2.2rem;font-weight:700;margin:6px 0}
+.metric-label{font-size:.8rem;color:var(--muted);text-transform:uppercase;letter-spacing:1px}
+.metric-hint{font-size:.76rem;color:var(--muted);margin-top:4px}
+.col-good{color:var(--green)}
+.col-warn{color:var(--yellow)}
+.col-bad{color:var(--pink)}
+.col-blue{color:var(--primary)}
+
+/* ──────────── Chart ──────────── */
+.chart-img{width:100%;border-radius:8px;margin:14px 0}
+
+/* ──────────── Recommendations ──────────── */
+.rec-list{display:flex;flex-direction:column;gap:8px;margin-top:12px}
+.rec-item{
+  padding:10px 14px;border-radius:8px;font-size:.88rem;
+  border-left:3px solid;
+}
+.rec-item.good{background:rgba(6,214,160,.08);border-color:var(--green)}
+.rec-item.warn{background:rgba(255,209,102,.08);border-color:var(--yellow)}
+.rec-item.info{background:rgba(76,201,240,.08);border-color:var(--primary)}
+
+/* ──────────── Image Grid ──────────── */
+.img-grid{
+  display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));
+  gap:16px;margin-top:16px;
+}
+.img-card{
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:10px;overflow:hidden;transition:transform .2s;
+}
+.img-card:hover{transform:translateY(-2px)}
+.img-card-header{
+  padding:8px 12px;display:flex;align-items:center;justify-content:space-between;
+  font-size:.8rem;
+}
+.img-card-header .type-badge{
+  padding:2px 8px;border-radius:12px;font-weight:700;font-size:.72rem;
+}
+.type-ok{background:rgba(76,201,240,.15);color:var(--primary)}
+.type-ng{background:rgba(247,37,133,.15);color:var(--pink)}
+.img-pair{display:grid;grid-template-columns:1fr 1fr}
+.img-pair img{width:100%;aspect-ratio:1;object-fit:cover}
+.img-pair-label{
+  text-align:center;font-size:.7rem;color:var(--muted);padding:4px;
+  background:var(--card);
+}
+.img-filename{
+  padding:6px 12px;font-size:.76rem;color:var(--muted);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+
+/* ──────────── Section separator ──────────── */
+.section-title{
+  font-size:1.3rem;font-weight:700;color:white;margin-bottom:20px;
+  display:flex;align-items:center;gap:10px;
+}
+.section-title::after{
+  content:'';flex:1;height:1px;background:var(--border);
+}
+
+/* ──────────── Steps (AI Sorting) ──────────── */
+.steps{display:flex;gap:0;margin-bottom:24px}
+.step{
+  flex:1;padding:12px 20px;text-align:center;
+  background:var(--surface);border:1px solid var(--border);
+  font-size:.88rem;color:var(--muted);cursor:default;
+  position:relative;
+}
+.step:first-child{border-radius:8px 0 0 8px}
+.step:last-child {border-radius:0 8px 8px 0}
+.step.active{background:rgba(76,201,240,.1);border-color:var(--primary);color:var(--primary);font-weight:600}
+.step.done{background:rgba(6,214,160,.08);border-color:var(--green);color:var(--green)}
+.step-num{
+  display:inline-block;width:22px;height:22px;
+  border-radius:50%;background:var(--border);
+  font-size:.75rem;font-weight:700;line-height:22px;
+  margin-right:8px;
+}
+.step.active .step-num{background:var(--primary);color:#0d0d1a}
+.step.done  .step-num{background:var(--green);color:#0d0d1a}
+
+/* ──────────── Canvas ROI ──────────── */
+.canvas-wrap{
+  position:relative;background:#000;border-radius:8px;
+  overflow:hidden;margin:12px 0;
+  display:flex;align-items:center;justify-content:center;
+  min-height:200px;
+}
+.canvas-wrap canvas{
+  display:block;cursor:crosshair;max-width:100%;
+}
+.canvas-placeholder{
+  color:var(--muted);font-size:.9rem;text-align:center;padding:40px;
+}
+.roi-tools{
+  display:flex;align-items:center;gap:10px;margin:10px 0;flex-wrap:wrap;
+}
+.roi-name-wrap{
+  display:none;align-items:center;gap:8px;
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:8px;padding:10px 14px;margin:8px 0;
+}
+.roi-name-wrap.show{display:flex}
+.roi-input{
+  flex:1;background:var(--bg);border:1px solid var(--border);
+  border-radius:6px;padding:7px 12px;color:var(--text);font-size:.9rem;
+}
+.roi-input:focus{outline:none;border-color:var(--primary)}
+
+/* ──────────── ROI List ──────────── */
+.roi-list{display:flex;flex-wrap:wrap;gap:10px;margin-top:10px}
+.roi-item{
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:8px;padding:8px 12px;
+  display:flex;align-items:center;gap:8px;font-size:.82rem;
+}
+.roi-color{width:12px;height:12px;border-radius:50%;flex-shrink:0}
+.roi-del{
+  background:none;border:none;color:var(--muted);
+  cursor:pointer;padding:0;font-size:.9rem;line-height:1;
+}
+.roi-del:hover{color:var(--pink)}
+
+/* ──────────── Template Thumbs ──────────── */
+.tmpl-thumbs{
+  display:flex;flex-wrap:wrap;gap:8px;margin:10px 0;
+}
+.tmpl-thumb{
+  width:72px;height:72px;object-fit:cover;
+  border-radius:6px;border:2px solid var(--border);
+  cursor:pointer;transition:border-color .15s;
+}
+.tmpl-thumb.selected{border-color:var(--primary)}
+
+/* ──────────── Sort Results ──────────── */
+.sort-results-section{margin-top:28px}
+.cat-block{
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:var(--radius);overflow:hidden;margin-bottom:20px;
+}
+.cat-header{
+  padding:12px 18px;background:var(--card);
+  display:flex;align-items:center;justify-content:space-between;
+}
+.cat-name{font-weight:700;color:var(--primary);font-size:1rem}
+.cat-count{
+  background:rgba(76,201,240,.12);color:var(--primary);
+  padding:2px 10px;border-radius:12px;font-size:.8rem;
+}
+.cat-preview-wrap{
+  display:flex;align-items:center;gap:10px;padding:10px 18px;
+  border-bottom:1px solid var(--border);
+}
+.cat-preview{
+  width:56px;height:56px;object-fit:cover;
+  border-radius:6px;border:2px solid var(--primary);
+}
+.cat-preview-label{font-size:.8rem;color:var(--muted)}
+.sort-img-grid{
+  display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));
+  gap:10px;padding:14px 18px;
+}
+.sort-img-item{
+  border-radius:8px;overflow:hidden;
+  background:var(--card);border:1px solid var(--border);
+  transition:transform .15s;
+}
+.sort-img-item:hover{transform:translateY(-2px)}
+.sort-img-item img{width:100%;aspect-ratio:1;object-fit:cover}
+.sort-img-info{
+  padding:5px 8px;font-size:.7rem;color:var(--muted);
+}
+.sim-bar{
+  height:3px;margin:3px 0;border-radius:2px;
+  background:linear-gradient(90deg,var(--primary),var(--purple));
+}
+
+/* ──────────── Toast ──────────── */
+.toast{
+  position:fixed;bottom:28px;right:28px;z-index:9999;
+  background:var(--card);border:1px solid var(--border);
+  border-radius:10px;padding:12px 20px;font-size:.88rem;
+  box-shadow:var(--shadow);transform:translateY(80px);opacity:0;
+  transition:all .3s;max-width:320px;
+}
+.toast.show{transform:translateY(0);opacity:1}
+.toast.success{border-left:3px solid var(--green)}
+.toast.error  {border-left:3px solid var(--pink)}
+.toast.info   {border-left:3px solid var(--primary)}
+
+/* ──────────── Divider ──────────── */
+.divider{height:1px;background:var(--border);margin:24px 0}
+
+/* ──────────── Empty state ──────────── */
+.empty{
+  text-align:center;color:var(--muted);padding:48px 20px;
+  font-size:.9rem;
+}
+.empty-icon{font-size:2.5rem;margin-bottom:10px;opacity:.5}
+</style>
+</head>
+<body>
+
+<!-- ────────── HEADER ────────── -->
+<header class="header">
+  <h1>⚙ DINOv3 工業視覺評估系統</h1>
+  <div class="status-badge">
+    <span class="status-dot" id="statusDot"></span>
+    <span id="statusText">正在檢查模型…</span>
+  </div>
+</header>
+
+<!-- ────────── TABS ────────── -->
+<nav class="tabs">
+  <button class="tab-btn active" onclick="switchTab('eval')">📊 評估結果</button>
+  <button class="tab-btn"        onclick="switchTab('sort')">🗂 AI 分類</button>
+</nav>
+
+<!-- ══════════════════════════════════════════
+     TAB 1: EVALUATION
+══════════════════════════════════════════ -->
+<div class="container">
+<section id="tab-eval" class="section active">
+
+  <div class="section-title">圖像質量評估</div>
+
+  <div class="grid-2">
+    <!-- OK Upload -->
+    <div class="card upload-ok">
+      <div class="card-title"><span class="icon">✅</span> OK 圖片（必填）</div>
+      <div class="upload-zone" id="okZone">
+        <input type="file" id="okInput" multiple accept="image/*" onchange="handleOkFiles(this.files)"/>
+        <div class="upload-icon">🖼</div>
+        <div class="upload-label">點擊或拖曳上傳 OK 圖片</div>
+        <div class="upload-sublabel">支援資料夾選擇 · JPG / PNG / BMP</div>
+      </div>
+      <div class="file-list" id="okFileList"></div>
+    </div>
+
+    <!-- NG Upload -->
+    <div class="card upload-ng">
+      <div class="card-title"><span class="icon">⚠️</span> NG 圖片（可選）</div>
+      <div class="upload-zone" id="ngZone">
+        <input type="file" id="ngInput" multiple accept="image/*" onchange="handleNgFiles(this.files)"/>
+        <div class="upload-icon">🔍</div>
+        <div class="upload-label">點擊或拖曳上傳 NG 圖片</div>
+        <div class="upload-sublabel">上傳後將計算 OK/NG 分離度</div>
+      </div>
+      <div class="file-list" id="ngFileList"></div>
+    </div>
+  </div>
+
+  <div style="text-align:center;margin:24px 0">
+    <button class="btn btn-primary" id="evalBtn" onclick="runEvaluation()" disabled>
+      ▶ 開始評估
+    </button>
+    <button class="btn btn-outline" style="margin-left:12px" onclick="clearEval()">
+      ✕ 清除
+    </button>
+  </div>
+
+  <!-- Loading -->
+  <div class="loading-box" id="evalLoading">
+    <div class="spinner"></div>
+    <span>正在提取特徵並計算指標，請稍候…</span>
+  </div>
+
+  <!-- Results -->
+  <div id="evalResults" style="display:none">
+
+    <!-- Metric numbers -->
+    <div class="metrics-row" id="metricsRow"></div>
+
+    <!-- Chart -->
+    <div class="card" style="margin-bottom:20px">
+      <div class="card-title"><span class="icon">📈</span> 評估圖表</div>
+      <img id="metricsChart" class="chart-img" alt="metrics chart"/>
+    </div>
+
+    <!-- Recommendations -->
+    <div class="card" style="margin-bottom:20px">
+      <div class="card-title"><span class="icon">💡</span> 評估建議</div>
+      <div class="rec-list" id="recList"></div>
+    </div>
+
+    <!-- Image visualisations -->
+    <div class="card">
+      <div class="card-title"><span class="icon">🗺</span> 特徵熱力圖可視化
+        <span style="font-size:.78rem;color:var(--muted);font-weight:400;margin-left:8px">左:原圖 / 右:DINOv3 注意力熱力圖</span>
+      </div>
+      <div class="img-grid" id="imgGrid"></div>
+    </div>
+  </div>
+
+</section>
+
+<!-- ══════════════════════════════════════════
+     TAB 2: AI SORTING
+══════════════════════════════════════════ -->
+<section id="tab-sort" class="section">
+
+  <div class="section-title">AI 圖像分類</div>
+
+  <!-- Steps -->
+  <div class="steps">
+    <div class="step active" id="step1-indicator">
+      <span class="step-num">1</span>設定模板 ROI
+    </div>
+    <div class="step" id="step2-indicator">
+      <span class="step-num">2</span>上傳目標圖片
+    </div>
+    <div class="step" id="step3-indicator">
+      <span class="step-num">3</span>查看分類結果
+    </div>
+  </div>
+
+  <!-- STEP 1: Templates + ROI Drawing -->
+  <div id="sortStep1">
+    <div class="grid-2">
+
+      <!-- Upload templates -->
+      <div class="card">
+        <div class="card-title"><span class="icon">📁</span> 上傳模板圖片</div>
+        <div class="upload-zone">
+          <input type="file" id="tmplInput" multiple accept="image/*" onchange="handleTmplFiles(this.files)"/>
+          <div class="upload-icon">📂</div>
+          <div class="upload-label">點擊或拖曳上傳模板圖片</div>
+          <div class="upload-sublabel">可選取整個資料夾或多張圖片</div>
+        </div>
+        <div class="file-list" id="tmplFileList"></div>
+        <div class="tmpl-thumbs" id="tmplThumbs"></div>
+      </div>
+
+      <!-- ROI Drawing -->
+      <div class="card">
+        <div class="card-title"><span class="icon">✏️</span> 繪製 ROI 框選區域
+          <span style="font-size:.76rem;color:var(--muted);font-weight:400">拖曳滑鼠在圖片上框選區域</span>
+        </div>
+
+        <div class="canvas-wrap" id="canvasWrap">
+          <div class="canvas-placeholder" id="canvasPlaceholder">
+            請先上傳模板圖片，<br/>然後點擊縮圖以開始框選
+          </div>
+          <canvas id="roiCanvas" style="display:none"></canvas>
+        </div>
+
+        <!-- ROI naming -->
+        <div class="roi-name-wrap" id="roiNameWrap">
+          <span style="font-size:.85rem;white-space:nowrap">ROI 名稱：</span>
+          <input class="roi-input" id="roiNameInput" placeholder="例如：焊點、缺陷區域…"
+                 onkeydown="if(event.key==='Enter')confirmROI()"/>
+          <button class="btn btn-primary btn-sm" onclick="confirmROI()">確認</button>
+          <button class="btn btn-outline btn-sm" onclick="cancelROI()">取消</button>
+        </div>
+
+        <div class="roi-tools">
+          <button class="btn btn-outline btn-sm" onclick="clearCanvasROIs()">🗑 清除所有框</button>
+          <span style="font-size:.8rem;color:var(--muted)">已定義 <b id="roiCount">0</b> 個 ROI</span>
+        </div>
+        <div class="roi-list" id="roiList"></div>
+      </div>
+    </div>
+
+    <div style="text-align:center;margin-top:20px">
+      <button class="btn btn-secondary" id="setTmplBtn" onclick="setTemplates()" disabled>
+        ✔ 確認模板設定，進入下一步
+      </button>
+    </div>
+
+    <!-- Loading -->
+    <div class="loading-box" id="tmplLoading">
+      <div class="spinner"></div>
+      <span>正在提取模板特徵…</span>
+    </div>
+  </div>
+
+  <!-- STEP 2: Target images -->
+  <div id="sortStep2" style="display:none">
+    <div class="divider"></div>
+    <div class="card">
+      <div class="card-title"><span class="icon">🎯</span> 上傳目標圖片</div>
+      <div class="upload-zone">
+        <input type="file" id="targetInput" multiple accept="image/*" onchange="handleTargetFiles(this.files)"/>
+        <div class="upload-icon">📂</div>
+        <div class="upload-label">點擊或拖曳上傳要分類的圖片</div>
+        <div class="upload-sublabel">支援選取整個資料夾</div>
+      </div>
+      <div class="file-list" id="targetFileList"></div>
+    </div>
+
+    <div style="text-align:center;margin-top:20px;display:flex;gap:12px;justify-content:center">
+      <button class="btn btn-outline" onclick="backToStep1()">← 重新設定模板</button>
+      <button class="btn btn-primary" id="matchBtn" onclick="runMatching()" disabled>
+        ▶ 開始 AI 分類
+      </button>
+    </div>
+
+    <div class="loading-box" id="matchLoading">
+      <div class="spinner"></div>
+      <span>正在匹配圖片，請稍候…</span>
+    </div>
+  </div>
+
+  <!-- STEP 3: Results -->
+  <div id="sortStep3" style="display:none" class="sort-results-section">
+    <div class="divider"></div>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+      <div class="section-title" style="margin-bottom:0">分類結果</div>
+      <div style="display:flex;gap:10px">
+        <button class="btn btn-outline btn-sm" onclick="backToStep2()">← 重新分類</button>
+        <button class="btn btn-success" onclick="downloadZip()">⬇ 下載 ZIP</button>
+      </div>
+    </div>
+    <div id="sortResultsContainer"></div>
+  </div>
+
+</section>
+</div>
+
+<!-- ────────── TOAST ────────── -->
+<div class="toast" id="toast"></div>
+
+<script>
+// ─────────────────────────────────────────────
+// Global state
+// ─────────────────────────────────────────────
+let okFiles    = [];
+let ngFiles    = [];
+let tmplFiles  = [];
+let targetFiles = [];
+
+let rois       = [];        // [{image_index, x, y, w, h, name, color}]
+let roiColors  = ['#f72585','#4cc9f0','#7209b7','#06d6a0','#ffd166','#ef476f','#118ab2'];
+let pendingROI = null;      // canvas-coordinate rect before naming
+
+let isDrawing  = false;
+let startX = 0, startY = 0;
+let selectedTmplIdx = -1;
+let tmplImgEls = [];        // loaded HTMLImageElement per template
+
+let sortResults  = null;    // last match results (for download)
+let sessionId    = 'session_' + Date.now();
+
+const canvas = document.getElementById('roiCanvas');
+const ctx    = canvas.getContext('2d');
+
+// ─────────────────────────────────────────────
+// Startup
+// ─────────────────────────────────────────────
+window.addEventListener('load', checkStatus);
+
+async function checkStatus() {
+  try {
+    const r = await fetch('/api/status');
+    const d = await r.json();
+    const dot  = document.getElementById('statusDot');
+    const txt  = document.getElementById('statusText');
+    if (d.model_loaded) {
+      dot.className = 'status-dot on';
+      txt.textContent = d.using_dinov2
+        ? `DINOv2 已就緒 (${d.device})`
+        : `CV 模式 (${d.device})`;
+    } else {
+      dot.className = 'status-dot off';
+      txt.textContent = '模型未加載 (CV fallback)';
+    }
+  } catch {
+    document.getElementById('statusText').textContent = '無法連接後端';
+  }
+}
+
+// ─────────────────────────────────────────────
+// Tab switching
+// ─────────────────────────────────────────────
+function switchTab(tab) {
+  document.querySelectorAll('.tab-btn').forEach((b,i) =>
+    b.classList.toggle('active', ['eval','sort'][i] === tab)
+  );
+  document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+  document.getElementById('tab-' + tab).classList.add('active');
+}
+
+// ─────────────────────────────────────────────
+// Toast
+// ─────────────────────────────────────────────
+let toastTimer = null;
+function showToast(msg, type='info') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className   = `toast show ${type}`;
+  if (toastTimer) clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 3500);
+}
+
+// ─────────────────────────────────────────────
+// ─────── TAB 1: EVALUATION ───────────────────
+// ─────────────────────────────────────────────
+
+function handleOkFiles(files) {
+  okFiles = Array.from(files).filter(f => f.type.startsWith('image/'));
+  renderFileTags('okFileList', okFiles, 'ok-tag');
+  updateEvalBtn();
+}
+function handleNgFiles(files) {
+  ngFiles = Array.from(files).filter(f => f.type.startsWith('image/'));
+  renderFileTags('ngFileList', ngFiles, 'ng-tag');
+  updateEvalBtn();
+}
+function renderFileTags(elId, files, cls) {
+  const el = document.getElementById(elId);
+  el.innerHTML = files.map(f =>
+    `<span class="file-tag ${cls}">${f.name}</span>`
+  ).join('');
+}
+function updateEvalBtn() {
+  document.getElementById('evalBtn').disabled = okFiles.length === 0;
+}
+function clearEval() {
+  okFiles = []; ngFiles = [];
+  document.getElementById('okInput').value = '';
+  document.getElementById('ngInput').value = '';
+  document.getElementById('okFileList').innerHTML = '';
+  document.getElementById('ngFileList').innerHTML = '';
+  document.getElementById('evalResults').style.display = 'none';
+  updateEvalBtn();
+}
+
+// Drag-and-drop for upload zones
+['okZone','ngZone'].forEach(id => {
+  const el = document.getElementById(id);
+  el.addEventListener('dragover', e => { e.preventDefault(); el.classList.add('drag-over'); });
+  el.addEventListener('dragleave', () => el.classList.remove('drag-over'));
+  el.addEventListener('drop', e => {
+    e.preventDefault(); el.classList.remove('drag-over');
+    const files = e.dataTransfer.files;
+    if (id === 'okZone') handleOkFiles(files);
+    else                  handleNgFiles(files);
+  });
+});
+
+async function runEvaluation() {
+  if (okFiles.length === 0) return;
+
+  document.getElementById('evalLoading').classList.add('show');
+  document.getElementById('evalResults').style.display = 'none';
+  document.getElementById('evalBtn').disabled = true;
+
+  try {
+    const fd = new FormData();
+    okFiles.forEach(f => fd.append('ok_images', f));
+    ngFiles.forEach(f => fd.append('ng_images', f));
+
+    const resp = await fetch('/api/evaluate', {method:'POST', body:fd});
+    const data = await resp.json();
+
+    if (!resp.ok) throw new Error(data.error || '評估失敗');
+
+    renderEvalResults(data);
+    showToast('評估完成！', 'success');
+
+  } catch(e) {
+    showToast('錯誤：' + e.message, 'error');
+  } finally {
+    document.getElementById('evalLoading').classList.remove('show');
+    document.getElementById('evalBtn').disabled = false;
+  }
+}
+
+function renderEvalResults(data) {
+  const { metrics, chart, visualizations, recommendations, summary } = data;
+
+  // ── Metric cards ──
+  const row = document.getElementById('metricsRow');
+  const score_color = v => v > 60 ? 'col-good' : v < 30 ? 'col-bad' : 'col-warn';
+  let html = `
+    <div class="metric-card">
+      <div class="metric-label">數據複雜度</div>
+      <div class="metric-val ${score_color(metrics.data_complexity)}">${metrics.data_complexity.toFixed(1)}</div>
+      <div class="metric-hint">OK 樣本多樣性</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-label">特徵豐富度</div>
+      <div class="metric-val ${score_color(metrics.feature_richness)}">${metrics.feature_richness.toFixed(1)}</div>
+      <div class="metric-hint">圖像信息量</div>
+    </div>`;
+  if (metrics.has_ng && metrics.ok_ng_separation !== null) {
+    html += `
+    <div class="metric-card">
+      <div class="metric-label">OK/NG 分離度</div>
+      <div class="metric-val ${score_color(metrics.ok_ng_separation)}">${metrics.ok_ng_separation.toFixed(1)}</div>
+      <div class="metric-hint">缺陷可辨識度</div>
+    </div>`;
+  } else {
+    html += `
+    <div class="metric-card">
+      <div class="metric-label">圖片數量</div>
+      <div class="metric-val col-blue">${summary.ok_count}</div>
+      <div class="metric-hint">OK 圖片張數</div>
+    </div>`;
+  }
+  row.innerHTML = html;
+
+  // ── Chart ──
+  document.getElementById('metricsChart').src = 'data:image/png;base64,' + chart;
+
+  // ── Recommendations ──
+  document.getElementById('recList').innerHTML = recommendations.map(r =>
+    `<div class="rec-item ${r.level}">${r.text}</div>`
+  ).join('');
+
+  // ── Image grid ──
+  document.getElementById('imgGrid').innerHTML = visualizations.map(v => `
+    <div class="img-card">
+      <div class="img-card-header">
+        <span class="type-badge type-${v.type.toLowerCase()}">${v.type}</span>
+        <span style="font-size:.7rem;color:var(--muted);overflow:hidden;text-overflow:ellipsis;max-width:140px">${v.filename}</span>
+      </div>
+      <div class="img-pair">
+        <div>
+          <img src="data:image/jpeg;base64,${v.original}" loading="lazy"/>
+          <div class="img-pair-label">原圖</div>
+        </div>
+        <div>
+          <img src="data:image/png;base64,${v.heatmap}" loading="lazy"/>
+          <div class="img-pair-label">特徵熱力圖</div>
+        </div>
+      </div>
+    </div>
+  `).join('');
+
+  document.getElementById('evalResults').style.display = 'block';
+  document.getElementById('evalResults').scrollIntoView({behavior:'smooth', block:'start'});
+}
+
+// ─────────────────────────────────────────────
+// ─────── TAB 2: AI SORTING ───────────────────
+// ─────────────────────────────────────────────
+
+// ── Template upload ──
+function handleTmplFiles(files) {
+  tmplFiles = Array.from(files).filter(f => f.type.startsWith('image/'));
+  renderFileTags('tmplFileList', tmplFiles, '');
+  renderTmplThumbs();
+  document.getElementById('setTmplBtn').disabled = tmplFiles.length === 0;
+}
+
+function renderTmplThumbs() {
+  tmplImgEls = [];
+  const container = document.getElementById('tmplThumbs');
+  container.innerHTML = '';
+  tmplFiles.forEach((f, i) => {
+    const url = URL.createObjectURL(f);
+    const img = document.createElement('img');
+    img.src = url; img.className = 'tmpl-thumb';
+    img.title = f.name;
+    img.onclick = () => selectTemplate(i);
+    container.appendChild(img);
+
+    // Pre-load
+    const el = new Image();
+    el.onload = () => { tmplImgEls[i] = el; };
+    el.src = url;
+  });
+}
+
+function selectTemplate(idx) {
+  selectedTmplIdx = idx;
+  document.querySelectorAll('.tmpl-thumb').forEach((el, i) =>
+    el.classList.toggle('selected', i === idx)
+  );
+  loadImageToCanvas(idx);
+}
+
+function loadImageToCanvas(idx) {
+  const f = tmplFiles[idx];
+  if (!f) return;
+
+  const url = URL.createObjectURL(f);
+  const img = new Image();
+  img.onload = () => {
+    tmplImgEls[idx] = img;
+
+    const wrap = document.getElementById('canvasWrap');
+    const maxW = wrap.clientWidth - 4;
+    const maxH = 420;
+    const scale = Math.min(maxW / img.naturalWidth, maxH / img.naturalHeight, 1);
+
+    canvas.width  = Math.round(img.naturalWidth  * scale);
+    canvas.height = Math.round(img.naturalHeight * scale);
+    canvas.dataset.scale    = scale;
+    canvas.dataset.imgIndex = idx;
+
+    canvas.style.display = 'block';
+    document.getElementById('canvasPlaceholder').style.display = 'none';
+    drawCanvas();
+  };
+  img.src = url;
+}
+
+function drawCanvas() {
+  const idx = parseInt(canvas.dataset.imgIndex ?? '-1');
+  if (idx < 0 || !tmplImgEls[idx]) return;
+  const img   = tmplImgEls[idx];
+  const scale = parseFloat(canvas.dataset.scale ?? '1');
+
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+  // Draw saved ROIs for this template
+  rois.filter(r => r.image_index === idx).forEach(r => {
+    const rx = r.x * scale, ry = r.y * scale;
+    const rw = r.w * scale, rh = r.h * scale;
+    ctx.strokeStyle = r.color;
+    ctx.lineWidth = 2;
+    ctx.strokeRect(rx, ry, rw, rh);
+
+    const lbl = r.name;
+    ctx.font = 'bold 12px sans-serif';
+    const tw = ctx.measureText(lbl).width + 10;
+    ctx.fillStyle = r.color;
+    ctx.fillRect(rx, ry - 20, tw, 20);
+    ctx.fillStyle = '#ffffff';
+    ctx.fillText(lbl, rx + 5, ry - 5);
+  });
+}
+
+// ── Mouse events for drawing ──
+canvas.addEventListener('mousedown', e => {
+  const rect = canvas.getBoundingClientRect();
+  startX = e.clientX - rect.left;
+  startY = e.clientY - rect.top;
+  isDrawing = true;
+});
+
+canvas.addEventListener('mousemove', e => {
+  if (!isDrawing) return;
+  const rect = canvas.getBoundingClientRect();
+  const cx = e.clientX - rect.left;
+  const cy = e.clientY - rect.top;
+  drawCanvas();
+  ctx.strokeStyle = '#4cc9f0';
+  ctx.lineWidth = 2;
+  ctx.setLineDash([6, 3]);
+  ctx.strokeRect(startX, startY, cx - startX, cy - startY);
+  ctx.setLineDash([]);
+});
+
+canvas.addEventListener('mouseup', e => {
+  if (!isDrawing) return;
+  isDrawing = false;
+  const rect = canvas.getBoundingClientRect();
+  const endX = e.clientX - rect.left;
+  const endY = e.clientY - rect.top;
+
+  const cx = Math.min(startX, endX), cy = Math.min(startY, endY);
+  const cw = Math.abs(endX - startX), ch = Math.abs(endY - startY);
+
+  if (cw > 8 && ch > 8) {
+    const scale = parseFloat(canvas.dataset.scale ?? '1');
+    const idx   = parseInt(canvas.dataset.imgIndex ?? '0');
+    pendingROI  = {
+      image_index: idx,
+      x: Math.round(cx / scale), y: Math.round(cy / scale),
+      w: Math.round(cw / scale), h: Math.round(ch / scale),
+    };
+    document.getElementById('roiNameWrap').classList.add('show');
+    document.getElementById('roiNameInput').value = '';
+    document.getElementById('roiNameInput').focus();
+  }
+  drawCanvas();
+});
+
+// Touch support
+canvas.addEventListener('touchstart', e => {
+  e.preventDefault();
+  const t = e.touches[0];
+  const r = canvas.getBoundingClientRect();
+  startX = t.clientX - r.left; startY = t.clientY - r.top;
+  isDrawing = true;
+});
+canvas.addEventListener('touchmove', e => {
+  e.preventDefault();
+  if (!isDrawing) return;
+  const t = e.touches[0];
+  const r = canvas.getBoundingClientRect();
+  const cx = t.clientX - r.left, cy = t.clientY - r.top;
+  drawCanvas();
+  ctx.strokeStyle = '#4cc9f0'; ctx.lineWidth = 2;
+  ctx.setLineDash([6,3]);
+  ctx.strokeRect(startX, startY, cx-startX, cy-startY);
+  ctx.setLineDash([]);
+});
+canvas.addEventListener('touchend', e => {
+  e.preventDefault();
+  if (!isDrawing) return;
+  isDrawing = false;
+  const t = e.changedTouches[0];
+  const r = canvas.getBoundingClientRect();
+  const endX = t.clientX - r.left, endY = t.clientY - r.top;
+  const cx = Math.min(startX,endX), cy = Math.min(startY,endY);
+  const cw = Math.abs(endX-startX), ch = Math.abs(endY-startY);
+  if (cw>8 && ch>8) {
+    const scale = parseFloat(canvas.dataset.scale??'1');
+    const idx   = parseInt(canvas.dataset.imgIndex??'0');
+    pendingROI  = { image_index:idx, x:Math.round(cx/scale), y:Math.round(cy/scale), w:Math.round(cw/scale), h:Math.round(ch/scale) };
+    document.getElementById('roiNameWrap').classList.add('show');
+    document.getElementById('roiNameInput').value=''; document.getElementById('roiNameInput').focus();
+  }
+  drawCanvas();
+});
+
+function confirmROI() {
+  const name = document.getElementById('roiNameInput').value.trim();
+  if (!name) { showToast('請輸入 ROI 名稱', 'error'); return; }
+  if (!pendingROI) return;
+  pendingROI.name  = name;
+  pendingROI.color = roiColors[rois.length % roiColors.length];
+  rois.push({...pendingROI});
+  pendingROI = null;
+  document.getElementById('roiNameWrap').classList.remove('show');
+  drawCanvas();
+  updateROIList();
+}
+
+function cancelROI() {
+  pendingROI = null;
+  document.getElementById('roiNameWrap').classList.remove('show');
+  drawCanvas();
+}
+
+function updateROIList() {
+  const list = document.getElementById('roiList');
+  document.getElementById('roiCount').textContent = rois.length;
+  list.innerHTML = rois.map((r, i) => `
+    <div class="roi-item">
+      <div class="roi-color" style="background:${r.color}"></div>
+      <span>${r.name}</span>
+      <span style="font-size:.72rem;color:var(--muted)">img${r.image_index+1}</span>
+      <button class="roi-del" onclick="deleteROI(${i})">✕</button>
+    </div>
+  `).join('');
+}
+
+function deleteROI(idx) {
+  rois.splice(idx, 1);
+  updateROIList();
+  drawCanvas();
+}
+
+function clearCanvasROIs() {
+  rois = [];
+  updateROIList();
+  drawCanvas();
+}
+
+// ── Set templates (send to backend) ──
+async function setTemplates() {
+  if (tmplFiles.length === 0) return;
+
+  document.getElementById('tmplLoading').classList.add('show');
+  document.getElementById('setTmplBtn').disabled = true;
+
+  try {
+    const fd = new FormData();
+    fd.append('session_id', sessionId);
+    tmplFiles.forEach(f => fd.append('images', f));
+    fd.append('rois', JSON.stringify(rois));
+
+    const resp = await fetch('/api/sort/set-templates', {method:'POST', body:fd});
+    const data = await resp.json();
+    if (!resp.ok) throw new Error(data.error || '設定失敗');
+
+    showToast(`模板設定完成！共 ${data.categories.length} 個分類`, 'success');
+    goToStep2();
+
+  } catch(e) {
+    showToast('錯誤：' + e.message, 'error');
+  } finally {
+    document.getElementById('tmplLoading').classList.remove('show');
+    document.getElementById('setTmplBtn').disabled = false;
+  }
+}
+
+// ── Target images ──
+function handleTargetFiles(files) {
+  targetFiles = Array.from(files).filter(f => f.type.startsWith('image/'));
+  renderFileTags('targetFileList', targetFiles, '');
+  document.getElementById('matchBtn').disabled = targetFiles.length === 0;
+}
+
+// ── Matching ──
+async function runMatching() {
+  if (targetFiles.length === 0) return;
+
+  document.getElementById('matchLoading').classList.add('show');
+  document.getElementById('matchBtn').disabled = true;
+
+  try {
+    const fd = new FormData();
+    fd.append('session_id', sessionId);
+    targetFiles.forEach(f => fd.append('images', f));
+
+    const resp = await fetch('/api/sort/match', {method:'POST', body:fd});
+    const data = await resp.json();
+    if (!resp.ok) throw new Error(data.error || '分類失敗');
+
+    sortResults = data;
+    renderSortResults(data);
+    showToast('分類完成！', 'success');
+    goToStep3();
+
+  } catch(e) {
+    showToast('錯誤：' + e.message, 'error');
+  } finally {
+    document.getElementById('matchLoading').classList.remove('show');
+    document.getElementById('matchBtn').disabled = false;
+  }
+}
+
+function renderSortResults(data) {
+  const { results, categories, previews } = data;
+  const container = document.getElementById('sortResultsContainer');
+
+  let html = '';
+  let total = 0;
+  categories.forEach(cat => {
+    const items  = results[cat] || [];
+    total += items.length;
+    const preview = previews[cat];
+    html += `
+      <div class="cat-block">
+        <div class="cat-header">
+          <div style="display:flex;align-items:center;gap:12px">
+            ${preview ? `<img src="data:image/jpeg;base64,${preview}" style="width:44px;height:44px;object-fit:cover;border-radius:6px;border:2px solid var(--primary)"/>` : ''}
+            <span class="cat-name">📂 ${cat}</span>
+          </div>
+          <span class="cat-count">${items.length} 張</span>
+        </div>
+        <div class="sort-img-grid">
+          ${items.length === 0
+            ? `<div class="empty" style="grid-column:1/-1;padding:20px"><div class="empty-icon">🔍</div>無匹配圖片</div>`
+            : items.map(item => `
+              <div class="sort-img-item">
+                <img src="data:image/jpeg;base64,${item.image}" loading="lazy"/>
+                <div class="sort-img-info">
+                  <div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${item.filename}</div>
+                  <div class="sim-bar" style="width:${Math.round(Math.max(0,Math.min(1,item.similarity))*100)}%"></div>
+                  <div style="color:var(--muted)">相似度: ${(item.similarity*100).toFixed(1)}%</div>
+                </div>
+              </div>
+            `).join('')
+          }
+        </div>
+      </div>
+    `;
+  });
+
+  html = `<div style="color:var(--muted);font-size:.88rem;margin-bottom:16px">共分類 <b style="color:white">${total}</b> 張圖片到 <b style="color:white">${categories.length}</b> 個類別</div>` + html;
+  container.innerHTML = html;
+}
+
+// ── Download ZIP ──
+async function downloadZip() {
+  if (!sortResults) return;
+  try {
+    const resp = await fetch('/api/sort/download', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({results: sortResults.results}),
+    });
+    if (!resp.ok) throw new Error('下載失敗');
+    const blob = await resp.blob();
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href = url; a.download = 'ai_sorting_results.zip';
+    document.body.appendChild(a); a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    showToast('ZIP 下載成功！', 'success');
+  } catch(e) {
+    showToast('下載錯誤：' + e.message, 'error');
+  }
+}
+
+// ── Step navigation ──
+function goToStep2() {
+  document.getElementById('step1-indicator').className = 'step done';
+  document.getElementById('step2-indicator').className = 'step active';
+  document.getElementById('sortStep1').style.display = 'none';
+  document.getElementById('sortStep2').style.display = 'block';
+  document.getElementById('sortStep3').style.display = 'none';
+}
+function goToStep3() {
+  document.getElementById('step2-indicator').className = 'step done';
+  document.getElementById('step3-indicator').className = 'step active';
+  document.getElementById('sortStep2').style.display = 'block'; // keep for back
+  document.getElementById('sortStep3').style.display = 'block';
+  document.getElementById('sortStep3').scrollIntoView({behavior:'smooth', block:'start'});
+}
+function backToStep1() {
+  document.getElementById('step1-indicator').className = 'step active';
+  document.getElementById('step2-indicator').className = 'step';
+  document.getElementById('step3-indicator').className = 'step';
+  document.getElementById('sortStep1').style.display = 'block';
+  document.getElementById('sortStep2').style.display = 'none';
+  document.getElementById('sortStep3').style.display = 'none';
+}
+function backToStep2() {
+  document.getElementById('step3-indicator').className = 'step';
+  document.getElementById('step2-indicator').className = 'step active';
+  document.getElementById('sortStep3').style.display = 'none';
+}
+
+// ── Drag and drop for sort upload zones ──
+document.querySelector('#sortStep1 .upload-zone').addEventListener('dragover', e => { e.preventDefault(); e.currentTarget.classList.add('drag-over'); });
+document.querySelector('#sortStep1 .upload-zone').addEventListener('dragleave', e => e.currentTarget.classList.remove('drag-over'));
+document.querySelector('#sortStep1 .upload-zone').addEventListener('drop', e => {
+  e.preventDefault(); e.currentTarget.classList.remove('drag-over');
+  handleTmplFiles(e.dataTransfer.files);
+});
+</script>
+</body>
+</html>

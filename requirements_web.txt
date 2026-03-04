@@ -1,0 +1,19 @@
+# ── Web server ────────────────────────────────
+flask>=2.3
+werkzeug>=2.3
+
+# ── Deep learning (DINOv2/3 backend) ─────────
+torch>=1.10
+torchvision>=0.11
+
+# ── Computer vision ───────────────────────────
+opencv-python>=4.5
+Pillow>=9.0
+
+# ── Machine learning ──────────────────────────
+scikit-learn>=1.0
+scipy>=1.7
+numpy>=1.21
+
+# ── Visualisation ────────────────────────────
+matplotlib>=3.5
