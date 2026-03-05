@@ -364,6 +364,36 @@ a{color:var(--primary);text-decoration:none}
 /* ──────────── Divider ──────────── */
 .divider{height:1px;background:var(--border);margin:24px 0}
 
+/* ──────────── Quality metrics ──────────── */
+.quality-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin:14px 0}
+@media(max-width:800px){.quality-grid{grid-template-columns:repeat(2,1fr)}}
+.qm-card{
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:10px;padding:14px 16px;
+}
+.qm-label{font-size:.75rem;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;margin-bottom:6px}
+.qm-val{font-size:1.55rem;font-weight:700;line-height:1}
+.qm-sub{font-size:.72rem;color:var(--muted);margin-top:5px}
+.qm-bar-wrap{margin-top:8px;background:var(--border);border-radius:4px;height:5px;overflow:hidden}
+.qm-bar{height:100%;border-radius:4px;transition:width .4s}
+/* quality flags on image cards */
+.flag-row{display:flex;flex-wrap:wrap;gap:4px;padding:4px 10px 6px}
+.flag-badge{
+  font-size:.65rem;padding:1px 7px;border-radius:10px;font-weight:600;
+}
+.flag-blur       {background:rgba(255,209,102,.18);color:var(--yellow)}
+.flag-overexposed{background:rgba(247,37,133,.18); color:var(--pink)}
+.flag-underexposed{background:rgba(114,9,183,.2);  color:#b56bff}
+.flag-noisy      {background:rgba(6,214,160,.15);  color:var(--green)}
+/* exposure warning summary */
+.exposure-row{display:flex;gap:10px;margin:8px 0;flex-wrap:wrap}
+.exp-chip{
+  display:flex;align-items:center;gap:6px;padding:5px 12px;
+  border-radius:20px;font-size:.8rem;
+}
+.exp-chip.ok  {background:rgba(6,214,160,.1); border:1px solid rgba(6,214,160,.3); color:var(--green)}
+.exp-chip.warn{background:rgba(255,209,102,.1);border:1px solid rgba(255,209,102,.3);color:var(--yellow)}
+
 /* ──────────── Empty state ──────────── */
 .empty{
   text-align:center;color:var(--muted);padding:48px 20px;
@@ -448,6 +478,16 @@ a{color:var(--primary);text-decoration:none}
     <div class="card" style="margin-bottom:20px">
       <div class="card-title"><span class="icon">📈</span> 評估圖表</div>
       <img id="metricsChart" class="chart-img" alt="metrics chart"/>
+    </div>
+
+    <!-- Traditional quality metrics -->
+    <div class="card" style="margin-bottom:20px" id="qualityCard" style="display:none">
+      <div class="card-title"><span class="icon">🔬</span> 傳統圖像品質分析
+        <span style="font-size:.76rem;color:var(--muted);font-weight:400;margin-left:8px">亮度 / 清晰度 / 對比度 / 雜訊（越高越好）</span>
+      </div>
+      <div class="quality-grid" id="qualityGrid"></div>
+      <div class="exposure-row" id="exposureRow"></div>
+      <img id="qualityChart" class="chart-img" alt="quality chart" style="margin-top:10px"/>
     </div>
 
     <!-- Recommendations -->
@@ -781,8 +821,33 @@ function renderEvalResults(data) {
     `<div class="rec-item ${r.level}">${r.text}</div>`
   ).join('');
 
+  // ── Quality card ──
+  renderQualityCard(data);
+
   // ── Image grid ──
-  document.getElementById('imgGrid').innerHTML = visualizations.map(v => `
+  document.getElementById('imgGrid').innerHTML = visualizations.map(v => {
+    const q = v.quality || {};
+    const flags = q.flags || [];
+    const flagHTML = flags.length
+      ? `<div class="flag-row">${flags.map(f => {
+          const labels = {blur:'模糊', overexposed:'過曝', underexposed:'欠曝', noisy:'高噪訊'};
+          return `<span class="flag-badge flag-${f}">${labels[f]||f}</span>`;
+        }).join('')}</div>`
+      : '';
+    // Mini quality scores as tiny sparkline
+    const qs = [
+      {label:'亮', val: q.brightness_score||0},
+      {label:'銳', val: q.sharpness_score||0},
+      {label:'對', val: q.contrast_score ||0},
+      {label:'噪', val: q.noise_score    ||0},
+    ];
+    const miniScores = `<div style="display:flex;gap:6px;padding:4px 10px 8px;flex-wrap:wrap">
+      ${qs.map(s => {
+        const c = s.val>=60?'#06d6a0':s.val>=30?'#ffd166':'#f72585';
+        return `<span style="font-size:.65rem;color:${c}">${s.label}:${s.val.toFixed(0)}</span>`;
+      }).join('')}
+    </div>`;
+    return `
     <div class="img-card">
       <div class="img-card-header">
         <span class="type-badge type-${v.type.toLowerCase()}">${v.type}</span>
@@ -798,11 +863,65 @@ function renderEvalResults(data) {
           <div class="img-pair-label">特徵熱力圖</div>
         </div>
       </div>
-    </div>
-  `).join('');
+      ${flagHTML}${miniScores}
+    </div>`;
+  }).join('');
 
   document.getElementById('evalResults').style.display = 'block';
   document.getElementById('evalResults').scrollIntoView({behavior:'smooth', block:'start'});
+}
+
+function renderQualityCard(data) {
+  const ok = data.quality_ok || {};
+  const hasNg = data.quality_ng && Object.keys(data.quality_ng).length > 0;
+  if (!Object.keys(ok).length) return;
+
+  const sc = v => v >= 60 ? 'col-good' : v >= 30 ? 'col-warn' : 'col-bad';
+  const barClr = v => v >= 60 ? '#06d6a0' : v >= 30 ? '#ffd166' : '#f72585';
+
+  const dims = [
+    { label:'亮度評分',   key:'brightness_score', hint:'過亮/過暗均扣分', unit:'' },
+    { label:'清晰度',     key:'sharpness_score',  hint:'Laplacian 方差', unit:'' },
+    { label:'對比度',     key:'contrast_score',   hint:'像素標準差',     unit:'' },
+    { label:'抗噪訊評分', key:'noise_score',       hint:'值越高雜訊越低', unit:'' },
+  ];
+
+  document.getElementById('qualityGrid').innerHTML = dims.map(d => {
+    const val  = ok[d.key + '_mean'] ?? 0;
+    const std  = ok[d.key + '_std']  ?? 0;
+    const ngVal = hasNg ? (data.quality_ng[d.key + '_mean'] ?? null) : null;
+    const ngStr = ngVal !== null
+      ? `<span style="font-size:.7rem;color:var(--pink);margin-left:8px">NG: ${ngVal.toFixed(0)}</span>`
+      : '';
+    return `
+      <div class="qm-card">
+        <div class="qm-label">${d.label}</div>
+        <div class="qm-val ${sc(val)}">${val.toFixed(0)}<span style="font-size:.9rem">/100</span>${ngStr}</div>
+        <div class="qm-sub">${d.hint} · σ ${std.toFixed(1)}</div>
+        <div class="qm-bar-wrap"><div class="qm-bar" style="width:${val}%;background:${barClr(val)}"></div></div>
+      </div>`;
+  }).join('');
+
+  // Exposure chips
+  const total   = ok.total || 1;
+  const overC   = ok.overexposed_count  || 0;
+  const underC  = ok.underexposed_count || 0;
+  const blurC   = ok.blur_count         || 0;
+  const brightM = ok.brightness_mean    || 0;
+  const chips = [
+    { label:`平均亮度 ${brightM.toFixed(0)}/255`, cls: brightM>60&&brightM<210 ? 'ok':'warn' },
+    { label:`過曝 ${overC}/${total} 張`,          cls: overC  === 0 ? 'ok':'warn' },
+    { label:`欠曝 ${underC}/${total} 張`,         cls: underC === 0 ? 'ok':'warn' },
+    { label:`模糊 ${blurC}/${total} 張`,          cls: blurC  === 0 ? 'ok':'warn' },
+  ];
+  document.getElementById('exposureRow').innerHTML =
+    chips.map(c => `<span class="exp-chip ${c.cls}">${c.label}</span>`).join('');
+
+  // Quality chart
+  if (data.quality_chart) {
+    document.getElementById('qualityChart').src = 'data:image/png;base64,' + data.quality_chart;
+  }
+  document.getElementById('qualityCard').style.display = 'block';
 }
 
 // ─────────────────────────────────────────────

@@ -10,6 +10,7 @@ import os
 import io
 import sys
 import json
+import math
 import base64
 import zipfile
 import numpy as np
@@ -211,6 +212,178 @@ def pil_to_b64(pil_img: Image.Image,
 
 
 # ─────────────────────────────────────────────
+# Traditional image quality metrics
+# ─────────────────────────────────────────────
+
+def compute_image_quality(pil_img: Image.Image) -> dict:
+    """
+    Returns per-image traditional CV quality metrics.
+    All *_score values are normalised to [0, 100] where higher = better.
+    """
+    img_np = np.array(pil_img.convert('RGB'))
+    gray   = cv2.cvtColor(img_np, cv2.COLOR_RGB2GRAY).astype(np.float32)
+
+    # ── Brightness ────────────────────────────
+    brightness = float(gray.mean())          # 0-255
+    # Bell-curve score: peak at 127.5, falls off toward 0 or 255
+    brightness_score = max(0.0, 100.0 - abs(brightness - 127.5) / 127.5 * 100)
+    overexposure_pct  = float((gray > 240).mean() * 100)
+    underexposure_pct = float((gray < 15 ).mean() * 100)
+
+    # ── Sharpness (Laplacian variance) ────────
+    lap_var       = float(cv2.Laplacian(gray.astype(np.uint8), cv2.CV_64F).var())
+    sharpness_score = min(100.0, math.log1p(lap_var) / math.log1p(1000) * 100)
+
+    # ── Contrast (RMS of luminance) ───────────
+    contrast       = float(gray.std())       # 0-127
+    contrast_score = min(100.0, contrast / 60.0 * 100)
+
+    # ── Noise (high-freq residual after 5×5 Gaussian) ────
+    blurred     = cv2.GaussianBlur(gray, (5, 5), 0)
+    noise       = float(np.std(gray - blurred))
+    noise_score = max(0.0, 100.0 - noise / 15.0 * 100)   # inverted: lower noise → higher score
+
+    # ── Warning flags ─────────────────────────
+    flags = []
+    if sharpness_score < 30:        flags.append('blur')
+    if overexposure_pct  > 5:       flags.append('overexposed')
+    if underexposure_pct > 5:       flags.append('underexposed')
+    if noise_score       < 40:      flags.append('noisy')
+
+    return {
+        'brightness':        round(brightness,        1),
+        'brightness_score':  round(brightness_score,  1),
+        'overexposure_pct':  round(overexposure_pct,  2),
+        'underexposure_pct': round(underexposure_pct, 2),
+        'sharpness_raw':     round(lap_var,           1),
+        'sharpness_score':   round(sharpness_score,   1),
+        'contrast':          round(contrast,          1),
+        'contrast_score':    round(contrast_score,    1),
+        'noise':             round(noise,             2),
+        'noise_score':       round(noise_score,       1),
+        'flags':             flags,
+    }
+
+
+def aggregate_quality(quality_list: list) -> dict:
+    """Aggregate per-image quality dicts into dataset-level summary."""
+    if not quality_list:
+        return {}
+    keys = ['brightness_score', 'sharpness_score', 'contrast_score', 'noise_score',
+            'brightness', 'overexposure_pct', 'underexposure_pct']
+    agg = {}
+    for k in keys:
+        vals = [q[k] for q in quality_list]
+        agg[k + '_mean'] = round(float(np.mean(vals)), 1)
+        agg[k + '_std']  = round(float(np.std(vals)),  1)
+        agg[k + '_min']  = round(float(np.min(vals)),  1)
+        agg[k + '_max']  = round(float(np.max(vals)),  1)
+    flag_names = ['blur', 'overexposed', 'underexposed', 'noisy']
+    for fn in flag_names:
+        agg[fn + '_count'] = sum(1 for q in quality_list if fn in q['flags'])
+    agg['total'] = len(quality_list)
+    return agg
+
+
+def quality_chart_b64(ok_quality: list, ng_quality: list | None = None) -> str:
+    """Quality chart: quality scores (OK vs NG) + warning flag counts."""
+    has_ng = bool(ng_quality)
+    ok_agg = aggregate_quality(ok_quality)
+    ng_agg = aggregate_quality(ng_quality) if has_ng else {}
+
+    fig = plt.figure(figsize=(14, 5), facecolor='#0d0d1a')
+
+    # ── Left: Quality score bars ───────────────
+    ax1 = fig.add_subplot(1, 2, 1)
+    ax1.set_facecolor('#161630')
+    dims   = ['Brightness', 'Sharpness', 'Contrast', 'Noise Score']
+    ok_scores = [
+        ok_agg.get('brightness_score_mean', 0),
+        ok_agg.get('sharpness_score_mean',  0),
+        ok_agg.get('contrast_score_mean',   0),
+        ok_agg.get('noise_score_mean',      0),
+    ]
+    y = np.arange(len(dims))
+    bar_h = 0.35
+
+    def bar_color(v):
+        return '#06d6a0' if v >= 60 else '#ffd166' if v >= 30 else '#f72585'
+
+    ok_bars = ax1.barh(y + (bar_h/2 if has_ng else 0), ok_scores,
+                       height=bar_h,
+                       color=[bar_color(v) for v in ok_scores],
+                       alpha=0.85, label='OK')
+    if has_ng:
+        ng_scores = [
+            ng_agg.get('brightness_score_mean', 0),
+            ng_agg.get('sharpness_score_mean',  0),
+            ng_agg.get('contrast_score_mean',   0),
+            ng_agg.get('noise_score_mean',      0),
+        ]
+        ax1.barh(y - bar_h/2, ng_scores, height=bar_h,
+                 color='#f72585', alpha=0.55, label='NG')
+        ax1.legend(fontsize=8, labelcolor='white',
+                   facecolor='#1e1e40', edgecolor='#333355')
+
+    ax1.set_yticks(y)
+    ax1.set_yticklabels(dims, color='white', fontsize=10)
+    ax1.set_xlim(0, 115)
+    ax1.set_xlabel('Score (0 – 100)', color='#aaaacc', fontsize=9)
+    ax1.set_title('傳統圖像品質指標', color='white', fontsize=12, pad=10)
+    ax1.tick_params(axis='x', colors='#aaaacc')
+    ax1.axvline(60, color='#06d6a0', linestyle='--', alpha=0.3, linewidth=1)
+    ax1.axvline(30, color='#f72585', linestyle='--', alpha=0.3, linewidth=1)
+    for spine in ax1.spines.values():
+        spine.set_edgecolor('#333355')
+    for bar, v in zip(ok_bars, ok_scores):
+        ax1.text(min(v + 2, 108), bar.get_y() + bar.get_height() / 2,
+                 f'{v:.0f}', va='center', color='white', fontsize=9, fontweight='bold')
+
+    # ── Right: Warning flag counts ─────────────
+    ax2 = fig.add_subplot(1, 2, 2)
+    ax2.set_facecolor('#161630')
+    flag_labels = ['模糊 (Blur)', '過曝 (Overexp)', '欠曝 (Underexp)', '高噪訊 (Noisy)']
+    flag_keys   = ['blur', 'overexposed', 'underexposed', 'noisy']
+    ok_counts   = [ok_agg.get(k + '_count', 0) for k in flag_keys]
+    total_ok    = ok_agg.get('total', 1)
+
+    xpos = np.arange(len(flag_labels))
+    w    = 0.35
+    ok_pct = [c / total_ok * 100 for c in ok_counts]
+    ax2.bar(xpos + (w/2 if has_ng else 0), ok_pct, width=w,
+            color=['#ffd166' if p > 0 else '#06d6a0' for p in ok_pct],
+            alpha=0.85, label='OK')
+    if has_ng:
+        total_ng = ng_agg.get('total', 1)
+        ng_counts = [ng_agg.get(k + '_count', 0) for k in flag_keys]
+        ng_pct    = [c / total_ng * 100 for c in ng_counts]
+        ax2.bar(xpos - w/2, ng_pct, width=w,
+                color='#f72585', alpha=0.55, label='NG')
+        ax2.legend(fontsize=8, labelcolor='white',
+                   facecolor='#1e1e40', edgecolor='#333355')
+
+    ax2.set_xticks(xpos)
+    ax2.set_xticklabels(flag_labels, color='white', fontsize=8.5, rotation=10)
+    ax2.set_ylabel('圖片比例 (%)', color='#aaaacc', fontsize=9)
+    ax2.set_ylim(0, 105)
+    ax2.set_title('品質問題分佈', color='white', fontsize=12, pad=10)
+    ax2.tick_params(axis='y', colors='#aaaacc')
+    for spine in ax2.spines.values():
+        spine.set_edgecolor('#333355')
+    for i, v in enumerate(ok_pct):
+        if v > 0:
+            ax2.text(xpos[i] + (w/2 if has_ng else 0), v + 1,
+                     f'{ok_counts[i]}張', ha='center', color='white', fontsize=8)
+
+    plt.tight_layout(pad=2.0)
+    buf = io.BytesIO()
+    plt.savefig(buf, format='PNG', bbox_inches='tight',
+                facecolor='#0d0d1a', dpi=100)
+    plt.close()
+    return base64.b64encode(buf.getvalue()).decode()
+
+
+# ─────────────────────────────────────────────
 # Evaluation metrics
 # ─────────────────────────────────────────────
 
@@ -376,31 +549,44 @@ def evaluate():
             return jsonify({'error': 'Please upload at least one OK image'}), 400
 
         ok_feats, ng_feats, visuals = [], [], []
+        ok_quality_list, ng_quality_list = [], []
 
         for f in ok_files[:20]:
             img = Image.open(f.stream).convert('RGB')
             ok_feats.append(extract_features(img))
-            fm = get_attention_map(img)
+            fm  = get_attention_map(img)
+            iq  = compute_image_quality(img)
+            ok_quality_list.append(iq)
             visuals.append({
                 'filename': secure_filename(f.filename),
-                'type': 'OK',
+                'type':     'OK',
                 'original': pil_to_b64(img),
-                'heatmap': heatmap_overlay_b64(fm, img),
+                'heatmap':  heatmap_overlay_b64(fm, img),
+                'quality':  iq,
             })
 
         for f in ng_files[:20]:
             img = Image.open(f.stream).convert('RGB')
             ng_feats.append(extract_features(img))
-            fm = get_attention_map(img)
+            fm  = get_attention_map(img)
+            iq  = compute_image_quality(img)
+            ng_quality_list.append(iq)
             visuals.append({
                 'filename': secure_filename(f.filename),
-                'type': 'NG',
+                'type':     'NG',
                 'original': pil_to_b64(img),
-                'heatmap': heatmap_overlay_b64(fm, img),
+                'heatmap':  heatmap_overlay_b64(fm, img),
+                'quality':  iq,
             })
 
-        metrics  = compute_metrics(ok_feats, ng_feats if ng_feats else None)
+        metrics   = compute_metrics(ok_feats, ng_feats if ng_feats else None)
         chart_b64 = metrics_chart_b64(metrics, len(ok_feats), len(ng_feats))
+
+        # Traditional quality aggregates + chart
+        ok_agg         = aggregate_quality(ok_quality_list)
+        ng_agg         = aggregate_quality(ng_quality_list) if ng_quality_list else {}
+        quality_chart  = quality_chart_b64(ok_quality_list,
+                                           ng_quality_list if ng_quality_list else None)
 
         # Recommendations
         recs = []
@@ -428,13 +614,55 @@ def evaluate():
             else:
                 recs.append({'level': 'warn', 'text': '⚠️ Low OK/NG separation – defect features overlap with normal images.'})
 
+        # ── Traditional quality recommendations ──
+        blur_c  = ok_agg.get('blur_count', 0)
+        total_n = ok_agg.get('total', 1)
+        avg_sharp  = ok_agg.get('sharpness_score_mean', 100)
+        avg_bright = ok_agg.get('brightness_mean', 127)
+        avg_cont   = ok_agg.get('contrast_score_mean', 100)
+        avg_noise  = ok_agg.get('noise_score_mean', 100)
+        overexp_c  = ok_agg.get('overexposed_count', 0)
+        underexp_c = ok_agg.get('underexposed_count', 0)
+
+        if avg_sharp < 40:
+            recs.append({'level': 'warn',
+                         'text': f'⚠️ 圖像整體偏模糊（清晰度分數 {avg_sharp:.0f}/100）'
+                                 f'，{blur_c}/{total_n} 張未達標準，建議檢查鏡頭焦距或避免相機震動。'})
+        elif avg_sharp > 70:
+            recs.append({'level': 'good',
+                         'text': f'✅ 圖像清晰度良好（平均 {avg_sharp:.0f}/100），適合模型訓練。'})
+        else:
+            recs.append({'level': 'info',
+                         'text': f'💡 圖像清晰度中等（平均 {avg_sharp:.0f}/100），可接受但有改善空間。'})
+
+        if overexp_c > 0 or underexp_c > 0:
+            recs.append({'level': 'warn',
+                         'text': f'⚠️ 發現曝光問題：{overexp_c} 張過曝、{underexp_c} 張欠曝，'
+                                  '建議調整光源強度或相機曝光時間。'})
+        else:
+            recs.append({'level': 'good',
+                         'text': f'✅ 整體曝光正常（平均亮度 {avg_bright:.0f}/255），無過曝或欠曝問題。'})
+
+        if avg_cont < 35:
+            recs.append({'level': 'warn',
+                         'text': f'⚠️ 圖像對比度偏低（{avg_cont:.0f}/100），缺陷與背景可能難以區分，'
+                                  '建議調整打光角度或使用環形燈。'})
+
+        if avg_noise < 50:
+            recs.append({'level': 'warn',
+                         'text': f'⚠️ 雜訊水平較高（品質分數 {avg_noise:.0f}/100），'
+                                  '建議降低相機 ISO 或增加曝光時間。'})
+
         return jsonify({
-            'metrics': metrics,
-            'chart': chart_b64,
+            'metrics':        metrics,
+            'chart':          chart_b64,
+            'quality_chart':  quality_chart,
+            'quality_ok':     ok_agg,
+            'quality_ng':     ng_agg,
             'visualizations': visuals,
             'recommendations': recs,
-            'summary': {'ok_count': len(ok_feats), 'ng_count': len(ng_feats)},
-            'using_dinov2': _using_dinov2,
+            'summary':        {'ok_count': len(ok_feats), 'ng_count': len(ng_feats)},
+            'using_dinov2':   _using_dinov2,
         })
 
     except Exception as exc:
