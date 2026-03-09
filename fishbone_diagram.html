@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>雲智判上線自動化流程 — 魚骨圖</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Microsoft JhengHei', 'Noto Sans TC', '微軟正黑體', sans-serif;
+    background: #f0f4f8;
+    color: #2c3e50;
+  }
+  header {
+    background: linear-gradient(135deg, #1a252f 0%, #2c3e50 100%);
+    color: white;
+    padding: 28px 40px;
+    text-align: center;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+  }
+  header h1 { font-size: 1.8rem; letter-spacing: 2px; margin-bottom: 6px; }
+  header p  { font-size: 0.95rem; opacity: 0.75; }
+  .diagram-wrap { overflow-x: auto; padding: 30px 20px; }
+  svg#fishbone { display: block; margin: 0 auto; min-width: 900px; }
+  .cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 20px;
+    padding: 0 40px 40px;
+    max-width: 1400px;
+    margin: 0 auto;
+  }
+  .card {
+    background: white;
+    border-radius: 12px;
+    padding: 22px 24px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+    border-top: 5px solid var(--c);
+    transition: transform 0.2s, box-shadow 0.2s;
+  }
+  .card:hover { transform: translateY(-4px); box-shadow: 0 8px 24px rgba(0,0,0,0.14); }
+  .card h2 { font-size: 1.05rem; margin-bottom: 14px; display: flex; align-items: center; gap: 8px; }
+  .badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 20px;
+    font-size: 0.72rem;
+    font-weight: 600;
+    background: var(--c);
+    color: white;
+  }
+  .card h3 { font-size: 0.82rem; color: #7f8c8d; text-transform: uppercase;
+              letter-spacing: 1px; margin: 12px 0 6px; }
+  .card ul { padding-left: 18px; }
+  .card li  { font-size: 0.88rem; line-height: 1.7; color: #34495e; }
+  .missing-item {
+    font-size: 0.84rem; line-height: 1.7;
+    color: var(--c);
+    font-weight: 600;
+    padding: 3px 8px;
+    margin: 3px 0;
+    background: color-mix(in srgb, var(--c) 10%, white);
+    border-radius: 4px;
+    border-left: 3px solid var(--c);
+  }
+  footer {
+    text-align: center;
+    padding: 20px;
+    font-size: 0.8rem;
+    color: #95a5a6;
+    border-top: 1px solid #dce3e8;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>雲智判上線自動化流程 — 魚骨圖分析</h1>
+  <p>從初期評估到模型上線各階段的核心缺失問題與建議補足技術</p>
+</header>
+
+<div class="diagram-wrap">
+<svg id="fishbone" viewBox="0 0 1100 520" xmlns="<http://www.w3.org/2000/svg>">
+  <defs>
+    <marker id="arrow-main" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#2c3e50"/>
+    </marker>
+    <marker id="arrow-red"    markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0,8 3,0 6" fill="#E74C3C"/></marker>
+    <marker id="arrow-orange" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0,8 3,0 6" fill="#E67E22"/></marker>
+    <marker id="arrow-yellow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0,8 3,0 6" fill="#D4AC0D"/></marker>
+    <marker id="arrow-green"  markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0,8 3,0 6" fill="#27AE60"/></marker>
+    <marker id="arrow-blue"   markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0,8 3,0 6" fill="#2980B9"/></marker>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="1" dy="2" stdDeviation="3" flood-opacity="0.15"/>
+    </filter>
+  </defs>
+
+  <rect width="1100" height="520" fill="#fafbfc"/>
+  <text x="550" y="34" text-anchor="middle" font-size="18" font-weight="bold"
+        fill="#2c3e50" font-family="'Microsoft JhengHei','Noto Sans TC',sans-serif">
+    雲智判上線自動化流程魚骨圖 — 缺失問題與技術分析
+  </text>
+
+  <!-- 主脊骨 -->
+  <line x1="60" y1="270" x2="935" y2="270" stroke="#2c3e50" stroke-width="4" marker-end="url(#arrow-main)"/>
+
+  <!-- 魚頭 -->
+  <rect x="940" y="215" width="150" height="110" rx="10" fill="#f0e6f9" stroke="#8e44ad" stroke-width="2.5" filter="url(#shadow)"/>
+  <text x="1015" y="253" text-anchor="middle" font-size="13" font-weight="bold" fill="#6c2a8c" font-family="'Microsoft JhengHei','Noto Sans TC',sans-serif">雲智判上線</text>
+  <text x="1015" y="272" text-anchor="middle" font-size="13" font-weight="bold" fill="#6c2a8c" font-family="'Microsoft JhengHei','Noto Sans TC',sans-serif">自動化流程</text>
+  <text x="1015" y="291" text-anchor="middle" font-size="13" font-weight="bold" fill="#6c2a8c" font-family="'Microsoft JhengHei','Noto Sans TC',sans-serif">核心缺失</text>
+
+  <!-- BONE 1: 初期評估 (TOP) -->
+  <line x1="155" y1="270" x2="90" y2="140" stroke="#E74C3C" stroke-width="3" marker-start="url(#arrow-red)"/>
+  <rect x="38" y="108" width="110" height="34" rx="8" fill="#E74C3C"/>
+  <text x="93" y="130" text-anchor="middle" font-size="13" font-weight="bold" fill="white" font-family="'Microsoft JhengHei','Noto Sans TC',sans-serif">初期評估</text>
+  <line x1="115" y1="215" x2="185" y2="215" stroke="#E74C3C" stroke-width="1.8"/>
+  <rect x="188" y="202" width="180" height="26" rx="5" fill="white" stroke="#E74C3C" stroke-width="1"/>
+  <text x="278" y="219" text-anchor="middle" font-size="10.5" fill="#2c3e50" font-family="'Microsoft JhengHei','Noto Sans TC',sans-serif">✗ 缺乏量化評估指標</text>
+  <line x1="128" y1="190" x2="198" y2="190" stroke="#E74C3C" stroke-width="1.8"/>
+  <rect x="201" y="177" width="198" height="26" rx="5" fill="white" stroke="#E74C3C" stroke-width="1"/>
+  <text x="300" y="194" text-anchor="middle" font-size="10.5" fill="#2c3e50" font-family="'Microsoft JhengHei','Noto Sans TC',sans-serif">✗ 缺乏模型可行性評估工具</text>
+  <line x1="108" y1="165" x2="178" y2="165" stroke="#E74C3C" stroke-width="1.8"/>
+  <rect x="181" y="152" width="190" height="26" rx="5" fill="white" stroke="#E74C3C" stroke-width="1"/>
+  <text x="276" y="169" text-anchor="middle" font-size="10.5" fill="#2c3e50" font-family="'Microsoft JhengHei','Noto Sans TC',sans-serif">✗ 完全依賴人工主觀判斷</text>
+  <rect x="38" y="58" width="200" height="44" rx="6" fill="#fdf0ef" stroke="#E74C3C" stroke-width="1.5" stroke-dasharray="5,3"/>
+  <text x="138" y="76" text-anchor="middle" font-size="10" fill="#E74C3C" font-weight="bold" font-family="'Microsoft JhengHei','Noto Sans TC',sans-serif">→ 自動化指標評估模組 (DINOv3)</text>
+  <text x="138" y="94" text-anchor="middle" font-size="10" fill="#E74C3C" font-weight="bold" font-family="'Microsoft JhengHei','Noto Sans TC',sans-serif">→ 數據可行性評分系統</text>
+
+  <!-- BONE 2: 數據標註 (BOTTOM) -->
+  <line x1="290" y1="270" x2="225" y2="400" stroke="#E67E22" stroke-width="3" marker-start="url(#arrow-orange)"/>
+  <rect x="170" y="398" width="110" height="34" rx="8" fill="#E67E22"/>
+  <text x="225" y="420" text-anchor="middle" font-size="13" font-weight="bold" fill="white" font-family="'Microsoft JhengHei','Noto Sans TC',sans-serif">數據標註</text>
+  <line x1="245" y1="316" x2="315" y2="316" stroke="#E67E22" stroke-width="1.8"/>
+  <rect x="318" y="303" width="186" height="26" rx="5" fill="white" stroke="#E67E22" stroke-width="1"/>
+  <text x="411" y="320" text-anchor="middle" font-size="10.5" fill="#2c3e50" font-family="'Microsoft JhengHei','Noto Sans TC',sans-serif">✗ 完全依賴人工手動標註</text>
+  <line x1="255" y1="342" x2="325" y2="342" stroke="#E67E22" stroke-width="1.8"/>
+  <rect x="328" y="329" width="196" height="26" rx="5" fill="white" stroke="#E67E22" stroke-width="1"/>
+  <text x="426" y="346" text-anchor="middle" font-size="10.5" fill="#2c3e50" font-family="'Microsoft JhengHei','Noto Sans TC',sans-serif">✗ 缺乏通用標註方法/框架</text>
+  <line x1="238" y1="368" x2="308" y2="368" stroke="#E67E22" stroke-width="1.8"/>
+  <rect x="311" y="355" width="192" height="26" rx="5" fill="white" stroke="#E67E22" stroke-width="1"/>
+  <text x="407" y="372" text-anchor="middle" font-size="10.5" fill="#2c3e50" font-family="'Microsoft JhengHei','Noto Sans TC',sans-serif">✗ 標註一致性難以保證</text>
+  <rect x="168" y="444" width="210" height="44" rx="6" fill="#fef4ec" stroke="#E67E22" stroke-width="1.5" stroke-dasharray="5,3"/>
+  <text x="273" y="462" text-anchor="middle" font-size="10" fill="#E67E22" font-weight="bold" font-family="'Microsoft JhengHei','Noto Sans TC',sans-serif">→ 半自動/主動學習標註工具</text>
+  <text x="273" y="480" text-anchor="middle" font-size="10" fill="#E67E22" font-weight="bold" font-family="'Microsoft JhengHei','Noto Sans TC',sans-serif">→ 通用標註標準與流程</text>
+
+  <!-- BONE 3: 模型訓練 (TOP) -->
+  <line x1="460" y1="270" x2="395" y2="140" stroke="#D4AC0D" stroke-width="3" marker-start="url(#arrow-yellow)"/>
+  <rect x="340" y="108" width="110" height="34" rx="8" fill="#D4AC0D"/>
+  <text x="395" y="130" text-anchor="middle" font-size="13" font-weight="bold" fill="white" font-family="'Microsoft JhengHei','Noto Sans TC',sans-serif">模型訓練</text>
+  <line x1="415" y1="215" x2="485" y2="215" stroke="#D4AC0D" stroke-width="1.8"/>
+  <rect x="488" y="202" width="188" height="26" rx="5" fill="white" stroke="#D4AC0D" stroke-width="1"/>
+  <text x="582" y="219" text-anchor="middle" font-size="10.5" fill="#2c3e50" font-family="'Microsoft JhengHei','Noto Sans TC',sans-serif">✗ 需要手動撰寫訓練程式碼</text>
+  <line x1="428" y1="190" x2="498" y2="190" stroke="#D4AC0D" stroke-width="1.8"/>
+  <rect x="501" y="177" width="196" height="26" rx="5" fill="white" stroke="#D4AC0D" stroke-width="1"/>
+  <text x="599" y="194" text-anchor="middle" font-size="10.5" fill="#2c3e50" font-family="'Microsoft JhengHei','Noto Sans TC',sans-serif">✗ 超參數調整依賴人工經驗</text>
+  <line x1="408" y1="165" x2="478" y2="165" stroke="#D4AC0D" stroke-width="1.8"/>
+  <rect x="481" y="152" width="198" height="26" rx="5" fill="white" stroke="#D4AC0D" stroke-width="1"/>
+  <text x="580" y="169" text-anchor="middle" font-size="10.5" fill="#2c3e50" font-family="'Microsoft JhengHei','Noto Sans TC',sans-serif">✗ 缺乏自動化訓練流水線</text>
+  <rect x="338" y="58" width="210" height="44" rx="6" fill="#fdfaec" stroke="#D4AC0D" stroke-width="1.5" stroke-dasharray="5,3"/>
+  <text x="443" y="76" text-anchor="middle" font-size="10" fill="#C49B0A" font-weight="bold" font-family="'Microsoft JhengHei','Noto Sans TC',sans-serif">→ AutoML / 訓練流水線自動化</text>
+  <text x="443" y="94" text-anchor="middle" font-size="10" fill="#C49B0A" font-weight="bold" font-family="'Microsoft JhengHei','Noto Sans TC',sans-serif">→ 超參數自動搜索 (HPO)</text>
+
+  <!-- BONE 4: 模型優化 (BOTTOM) -->
+  <line x1="620" y1="270" x2="555" y2="400" stroke="#27AE60" stroke-width="3" marker-start="url(#arrow-green)"/>
+  <rect x="500" y="398" width="110" height="34" rx="8" fill="#27AE60"/>
+  <text x="555" y="420" text-anchor="middle" font-size="13" font-weight="bold" fill="white" font-family="'Microsoft JhengHei','Noto Sans TC',sans-serif">模型優化</text>
+  <line x1="575" y1="308" x2="645" y2="308" stroke="#27AE60" stroke-width="1.8"/>
+  <rect x="648" y="295" width="184" height="26" rx="5" fill="white" stroke="#27AE60" stroke-width="1"/>
+  <text x="740" y="312" text-anchor="middle" font-size="10.5" fill="#2c3e50" font-family="'Microsoft JhengHei','Noto Sans TC',sans-serif">✗ 設備差異導致大量過殺</text>
+  <line x1="583" y1="331" x2="653" y2="331" stroke="#27AE60" stroke-width="1.8"/>
+  <rect x="656" y="318" width="220" height="26" rx="5" fill="white" stroke="#27AE60" stroke-width="1"/>
+  <text x="766" y="335" text-anchor="middle" font-size="10.5" fill="#2c3e50" font-family="'Microsoft JhengHei','Noto Sans TC',sans-serif">✗ 曝光度/機台調整造成圖像偏移</text>
+  <line x1="568" y1="356" x2="638" y2="356" stroke="#27AE60" stroke-width="1.8"/>
+  <rect x="641" y="343" width="218" height="26" rx="5" fill="white" stroke="#27AE60" stroke-width="1"/>
+  <text x="750" y="360" text-anchor="middle" font-size="10.5" fill="#2c3e50" font-family="'Microsoft JhengHei','Noto Sans TC',sans-serif">✗ 新機台須大量重新人工 Label</text>
+  <rect x="498" y="444" width="230" height="56" rx="6" fill="#edfaf3" stroke="#27AE60" stroke-width="1.5" stroke-dasharray="5,3"/>
+  <text x="613" y="462" text-anchor="middle" font-size="10" fill="#1e8449" font-weight="bold" font-family="'Microsoft JhengHei','Noto Sans TC',sans-serif">→ 自動域適應 (Domain Adaptation)</text>
+  <text x="613" y="480" text-anchor="middle" font-size="10" fill="#1e8449" font-weight="bold" font-family="'Microsoft JhengHei','Noto Sans TC',sans-serif">→ AI 輔助標註 / 主動學習</text>
+  <text x="613" y="496" text-anchor="middle" font-size="10" fill="#1e8449" font-weight="bold" font-family="'Microsoft JhengHei','Noto Sans TC',sans-serif">→ 多機台差異自動補償</text>
+
+  <!-- BONE 5: 用戶反饋 (TOP) -->
+  <line x1="790" y1="270" x2="725" y2="140" stroke="#2980B9" stroke-width="3" marker-start="url(#arrow-blue)"/>
+  <rect x="670" y="108" width="110" height="34" rx="8" fill="#2980B9"/>
+  <text x="725" y="130" text-anchor="middle" font-size="13" font-weight="bold" fill="white" font-family="'Microsoft JhengHei','Noto Sans TC',sans-serif">用戶反饋</text>
+  <line x1="745" y1="215" x2="815" y2="215" stroke="#2980B9" stroke-width="1.8"/>
+  <rect x="818" y="202" width="218" height="26" rx="5" fill="white" stroke="#2980B9" stroke-width="1"/>
+  <text x="927" y="219" text-anchor="middle" font-size="10.5" fill="#2c3e50" font-family="'Microsoft JhengHei','Noto Sans TC',sans-serif">✗ 僅能獲得「復判 OK」反饋</text>
+  <line x1="758" y1="190" x2="828" y2="190" stroke="#2980B9" stroke-width="1.8"/>
+  <rect x="831" y="177" width="196" height="26" rx="5" fill="white" stroke="#2980B9" stroke-width="1"/>
+  <text x="929" y="194" text-anchor="middle" font-size="10.5" fill="#2c3e50" font-family="'Microsoft JhengHei','Noto Sans TC',sans-serif">✗ 缺乏漏檢 Sorting 機制</text>
+  <line x1="738" y1="165" x2="808" y2="165" stroke="#2980B9" stroke-width="1.8"/>
+  <rect x="811" y="152" width="218" height="26" rx="5" fill="white" stroke="#2980B9" stroke-width="1"/>
+  <text x="920" y="169" text-anchor="middle" font-size="10.5" fill="#2c3e50" font-family="'Microsoft JhengHei','Noto Sans TC',sans-serif">✗ 過殺/漏檢反饋無法閉環進模型</text>
+  <rect x="668" y="58" width="230" height="44" rx="6" fill="#ebf5fb" stroke="#2980B9" stroke-width="1.5" stroke-dasharray="5,3"/>
+  <text x="783" y="76" text-anchor="middle" font-size="10" fill="#1a5276" font-weight="bold" font-family="'Microsoft JhengHei','Noto Sans TC',sans-serif">→ OK/NG 雙向反饋閉環系統</text>
+  <text x="783" y="94" text-anchor="middle" font-size="10" fill="#1a5276" font-weight="bold" font-family="'Microsoft JhengHei','Noto Sans TC',sans-serif">→ 漏檢異常 Sorting 模型</text>
+
+  <!-- 圖例 -->
+  <rect x="60" y="462" width="10" height="10" fill="#E74C3C"/>
+  <text x="76" y="471" font-size="10" fill="#2c3e50" font-family="'Microsoft JhengHei','Noto Sans TC',sans-serif">初期評估</text>
+  <rect x="145" y="462" width="10" height="10" fill="#E67E22"/>
+  <text x="161" y="471" font-size="10" fill="#2c3e50" font-family="'Microsoft JhengHei','Noto Sans TC',sans-serif">數據標註</text>
+  <rect x="230" y="462" width="10" height="10" fill="#D4AC0D"/>
+  <text x="246" y="471" font-size="10" fill="#2c3e50" font-family="'Microsoft JhengHei','Noto Sans TC',sans-serif">模型訓練</text>
+  <rect x="315" y="462" width="10" height="10" fill="#27AE60"/>
+  <text x="331" y="471" font-size="10" fill="#2c3e50" font-family="'Microsoft JhengHei','Noto Sans TC',sans-serif">模型優化</text>
+  <rect x="400" y="462" width="10" height="10" fill="#2980B9"/>
+  <text x="416" y="471" font-size="10" fill="#2c3e50" font-family="'Microsoft JhengHei','Noto Sans TC',sans-serif">用戶反饋</text>
+  <rect x="485" y="462" width="10" height="10" fill="#f5f5f5" stroke="#888" stroke-dasharray="3,2"/>
+  <text x="501" y="471" font-size="10" fill="#555" font-family="'Microsoft JhengHei','Noto Sans TC',sans-serif">建議補足技術</text>
+</svg>
+</div>
+
+<div class="cards">
+  <div class="card" style="--c:#E74C3C">
+    <h2><span class="badge">01</span> 初期評估</h2>
+    <h3>現存問題</h3>
+    <ul>
+      <li>缺乏量化評估指標</li>
+      <li>缺乏模型可行性評估工具</li>
+      <li>完全依賴人工主觀判斷</li>
+      <li>評估時程冗長</li>
+    </ul>
+    <h3>建議補足技術</h3>
+    <div class="missing-item">→ 自動化指標評估模組 (DINOv3)</div>
+    <div class="missing-item">→ 數據可行性評分系統</div>
+  </div>
+  <div class="card" style="--c:#E67E22">
+    <h2><span class="badge">02</span> 數據標註</h2>
+    <h3>現存問題</h3>
+    <ul>
+      <li>完全依賴人工手動標註</li>
+      <li>缺乏通用標註方法/框架</li>
+      <li>標註一致性難以保證</li>
+      <li>標註效率低，開發時程長</li>
+    </ul>
+    <h3>建議補足技術</h3>
+    <div class="missing-item">→ 半自動/主動學習標註工具</div>
+    <div class="missing-item">→ 通用標註標準與流程</div>
+  </div>
+  <div class="card" style="--c:#D4AC0D">
+    <h2><span class="badge">03</span> 模型訓練</h2>
+    <h3>現存問題</h3>
+    <ul>
+      <li>需要手動撰寫訓練程式碼</li>
+      <li>超參數調整依賴人工經驗</li>
+      <li>缺乏自動化訓練流水線</li>
+      <li>重複性工作佔用大量開發資源</li>
+    </ul>
+    <h3>建議補足技術</h3>
+    <div class="missing-item">→ AutoML / 訓練流水線自動化</div>
+    <div class="missing-item">→ 超參數自動搜索 (HPO)</div>
+  </div>
+  <div class="card" style="--c:#27AE60">
+    <h2><span class="badge">04</span> 模型優化</h2>
+    <h3>現存問題</h3>
+    <ul>
+      <li>設備差異導致大量過殺</li>
+      <li>曝光度/機台調整造成圖像偏移</li>
+      <li>新機台須大量重新人工 Label</li>
+      <li>缺乏自動化優化與輔助標註方案</li>
+      <li>10 台機台只標 2 台，其餘補標成本高</li>
+    </ul>
+    <h3>建議補足技術</h3>
+    <div class="missing-item">→ 自動域適應 (Domain Adaptation)</div>
+    <div class="missing-item">→ AI 輔助標註 / 主動學習</div>
+    <div class="missing-item">→ 多機台差異自動補償</div>
+  </div>
+  <div class="card" style="--c:#2980B9">
+    <h2><span class="badge">05</span> 用戶反饋</h2>
+    <h3>現存問題</h3>
+    <ul>
+      <li>僅能獲得「復判 OK」反饋資訊</li>
+      <li>缺乏漏檢 Sorting 機制</li>
+      <li>過殺/漏檢反饋無法閉環進模型</li>
+      <li>缺乏相似異常物料自動搜尋能力</li>
+    </ul>
+    <h3>建議補足技術</h3>
+    <div class="missing-item">→ OK/NG 雙向反饋閉環系統</div>
+    <div class="missing-item">→ 漏檢異常 Sorting 模型</div>
+    <div class="missing-item">→ 持續學習 (Continual Learning)</div>
+  </div>
+</div>
+
+<footer>
+  雲智判上線自動化流程分析 &nbsp;|&nbsp; 魚骨圖 (Ishikawa Diagram) &nbsp;|&nbsp; 2026
+</footer>
+
+</body>
+</html>
